@@ -2,8 +2,7 @@ module Kornik.Proxy
   ( ProxyNode(..)
   , parse
   , parseFile
-  )
-where
+  ) where
 
 import Prelude
   ( String
@@ -37,7 +36,11 @@ import Data.ByteString (drop, take, ByteString, readFile)
 
 -- |Untyped intermediate syntax tree.
 newtype ProxyNode
-  = ProxyNode (String, ByteString, [ProxyNode])
+  = ProxyNode
+    ( String  -- ^Node name.
+    , ByteString  -- ^Node text.
+    , [ProxyNode] -- ^Node children.
+    )
   deriving (Show)
 
 -- |Parses given `content` according to `language` into untyped intermediate syntax tree. 
