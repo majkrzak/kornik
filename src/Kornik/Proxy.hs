@@ -17,6 +17,11 @@ import Prelude
   , (-)
   , (<>)
   , FilePath
+  , Maybe(..)
+  , pure
+  , (<$>)
+  , (/=)
+  , (.)
   )
 import TreeSitter.Language (Language)
 import Foreign.Ptr (Ptr)
@@ -29,15 +34,15 @@ import TreeSitter.Cursor
   , ts_tree_cursor_goto_parent
   , ts_tree_cursor_goto_next_sibling
   )
-import Foreign (castPtr, peek)
-import Foreign.C (peekCString)
-import TreeSitter.Node (nodeType, nodeStartByte, nodeEndByte)
-import Data.ByteString (drop, take, ByteString, readFile)
+import Foreign (castPtr, peek, nullPtr)
+import TreeSitter.Node (nodeType, nodeStartByte, nodeEndByte, nodeFieldName)
+import Data.ByteString (drop, take, ByteString, readFile, packCString)
 
 -- |Untyped intermediate syntax tree.
 newtype ProxyNode
   = ProxyNode
-    ( String  -- ^Node name.
+    ( ByteString  -- ^Node name.
+    , Maybe ByteString -- ^Node field
     , ByteString  -- ^Node text.
     , [ProxyNode] -- ^Node children.
     )
@@ -63,14 +68,18 @@ parse language content = withParser language $ \parser ->
               False -> return []
 
             proxyNode <- do
-              nodeType' <- peekCString $ nodeType node'
+              nodeType'  <- packCString $ nodeType node'
+              nodeField' <- if nodeFieldName node' /= nullPtr
+                then Just <$> (packCString . nodeFieldName) node'
+                else return Nothing
               let nodeStartByte' = fromIntegral $ nodeStartByte node'
               let nodeEndByte'   = fromIntegral $ nodeEndByte node'
               let
                 nodeContent' = take
                   (nodeEndByte' - nodeStartByte')
                   (drop nodeStartByte' content)
-              return $ ProxyNode (nodeType', nodeContent', children')
+              return
+                $ ProxyNode (nodeType', nodeField', nodeContent', children')
 
             ts_tree_cursor_goto_next_sibling cursor >>= \case
               True  -> walk $ acc <> [proxyNode]
